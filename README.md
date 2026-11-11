@@ -46,3 +46,11 @@ add the D1 binding named `DB` under Settings → Functions, then `npm run db:mig
 - All yard data in the migration is fictional.
 - Pages 404 when a city/machine combo has no suppliers (thin-content guard).
 - Next steps: sitemap (chunked, 50k URL limit), lead email notifications, real data import, Turnstile on the form.
+
+## Importing real yards from OpenStreetMap
+```bash
+npm run import:city -- "Austin" TX            # creates data/import-tx-austin.sql
+npm run db:import:local -- data/import-tx-austin.sql     # test copy
+npm run db:import:remote -- data/import-tx-austin.sql    # live site
+```
+Add `--stocks skid-steer-rental,boom-lift-rental` only for machines you have verified yards stock.

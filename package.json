@@ -11,7 +11,10 @@
     "db:create": "wrangler d1 create rentlocalmachinery-db",
     "db:migrate:local": "wrangler d1 migrations apply rentlocalmachinery-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply rentlocalmachinery-db --remote",
-    "deploy": "npm run build && wrangler pages deploy ./dist"
+    "deploy": "npm run build && wrangler pages deploy ./dist",
+    "import:city": "node scripts/import-osm.mjs",
+    "db:import:local": "wrangler d1 execute rentlocalmachinery-db --local --file",
+    "db:import:remote": "wrangler d1 execute rentlocalmachinery-db --remote --file"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.0",
