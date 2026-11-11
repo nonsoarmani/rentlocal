@@ -1,0 +1,12 @@
+# wrangler.toml — Cloudflare Pages project config
+name = "rentlocalmachinery"
+pages_build_output_dir = "./dist"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 binding. Run `npm run db:create`, then paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "rentlocalmachinery-db"
+database_id = "8c000f97-7c21-4436-9915-bc08ab9559b6"
+migrations_dir = "migrations"

@@ -1,0 +1,48 @@
+# RentLocalMachinery.com
+
+Programmatic-SEO directory + lead-gen for heavy equipment rentals.
+**Stack:** Astro 5 (SSR) · Tailwind CSS 4 · Cloudflare Pages · Cloudflare D1.
+
+## Why Astro (not Next.js)
+10,000+ pages are rendered **on demand at the edge** from D1 and cached by Cloudflare's CDN
+(`s-maxage` + `stale-while-revalidate`), so builds stay seconds long regardless of page count.
+Astro ships zero JS by default (best Core Web Vitals) and has first-class Cloudflare support,
+without the `@cloudflare/next-on-pages` compatibility layer.
+
+## Structure
+```
+migrations/0001_init.sql                      D1 schema + mock data (3 machines, 5 yards, leads table)
+wrangler.toml                                 Pages + D1 binding
+src/lib/db.ts                                 all SQL queries
+src/lib/content.ts                            programmatic copy (intro, price band, FAQs)
+src/lib/us-states.ts                          slug/code/name helpers
+src/components/LeadForm.astro                 lead capture form
+src/components/YardCard.astro                 partner vs free listing card
+src/pages/index.astro                         homepage
+src/pages/rentals/[state]/index.astro         state hub
+src/pages/rentals/[state]/[city]/index.astro  city hub
+src/pages/rentals/[state]/[city]/[equipment].astro   money page
+src/pages/api/lead.ts                         lead POST endpoint -> D1
+```
+
+## Setup
+```bash
+npm install
+npm run db:create            # copy the printed database_id into wrangler.toml
+npm run db:migrate:local     # create tables + mock data locally
+npm run dev                  # http://localhost:4321/rentals/texas/austin/skid-steer-rental
+```
+
+Deploy: connect the GitHub repo in Cloudflare Pages (build command `npm run build`, output `dist`),
+add the D1 binding named `DB` under Settings → Functions, then `npm run db:migrate:remote`.
+
+## Try these URLs (mock data)
+- `/rentals/texas`
+- `/rentals/texas/austin`
+- `/rentals/texas/austin/skid-steer-rental`
+- `/rentals/texas/round-rock/boom-lift-rental`
+
+## Notes
+- All yard data in the migration is fictional.
+- Pages 404 when a city/machine combo has no suppliers (thin-content guard).
+- Next steps: sitemap (chunked, 50k URL limit), lead email notifications, real data import, Turnstile on the form.
