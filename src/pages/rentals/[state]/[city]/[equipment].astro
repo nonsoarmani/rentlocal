@@ -1,0 +1,230 @@
+---
+// src/pages/rentals/[state]/[city]/[equipment].astro
+// Route: /rentals/:state/:city/:equipment   e.g. /rentals/texas/austin/skid-steer-rental
+//
+// Rendered on demand at the edge (SSR) from Cloudflare D1, then cached by the CDN.
+import Layout from '../../../../layouts/Layout.astro';
+import LeadForm from '../../../../components/LeadForm.astro';
+import YardCard from '../../../../components/YardCard.astro';
+import {
+  getEquipmentBySlug,
+  getEquipmentInCity,
+  getYardsInCity,
+  getYardsStockingInState,
+  distanceMiles,
+} from '../../../../lib/db';
+import { stateFromSlug } from '../../../../lib/us-states';
+import { buildFaqs, buildIntro, money, rateRange } from '../../../../lib/content';
+
+const { state: stateParam, city: cityParam, equipment: equipmentParam } = Astro.params;
+const notFound = () => new Response(null, { status: 404, statusText: 'Not Found' });
+
+// ---- 1. Validate URL params before touching the database ------------------------------------
+const state = stateParam ? stateFromSlug(stateParam) : undefined;
+if (!state || !cityParam || !equipmentParam) return notFound();
+
+const db = Astro.locals.runtime.env.DB;
+
+// ---- 2. Load the equipment type + all yards in this city (to prove the city exists) ---------
+const [equipment, cityYards] = await Promise.all([
+  getEquipmentBySlug(db, equipmentParam),
+  getYardsInCity(db, state.code, cityParam),
+]);
+if (!equipment || cityYards.length === 0) return notFound(); // unknown machine or city => real 404
+
+// Display name for the city comes from the DB row ("Round Rock"), not the slug.
+const cityName = cityYards[0].city;
+
+// ---- 3. Yards stocking this machine: in-city first, then nearby within 50 miles -------------
+const stateYards = await getYardsStockingInState(db, equipment.id, state.code);
+const localYards = stateYards.filter((y) => y.city.toLowerCase().replace(/ /g, '-') === cityParam);
+
+// City centroid = mean of its yards' coordinates (falls back to none if no coordinates exist).
+const coords = cityYards.filter((y) => y.latitude != null && y.longitude != null);
+const centre = coords.length
+  ? {
+      lat: coords.reduce((s, y) => s + y.latitude!, 0) / coords.length,
+      lon: coords.reduce((s, y) => s + y.longitude!, 0) / coords.length,
+    }
+  : null;
+
+const NEARBY_RADIUS_MILES = 50;
+const nearbyYards = centre
+  ? stateYards
+      .filter((y) => !localYards.includes(y) && y.latitude != null && y.longitude != null)
+      .map((y) => ({ ...y, miles: distanceMiles(centre.lat, centre.lon, y.latitude!, y.longitude!) }))
+      .filter((y) => y.miles <= NEARBY_RADIUS_MILES)
+      // partners first, then closest
+      .sort((a, b) => b.is_partner - a.is_partner || a.miles - b.miles)
+      .slice(0, 8)
+  : [];
+
+// Thin-content guard: no supplier at all => 404 rather than an empty indexable page.
+if (localYards.length + nearbyYards.length === 0) return notFound();
+
+// Partners get top placement within each group (already sorted by the query / sort above).
+const facts = { equipment, city: cityName, stateName: state.name, stateCode: state.code, localYards, nearbyYards };
+const intro = buildIntro(facts);
+const faqs = buildFaqs(facts);
+const range = rateRange(equipment.avg_daily_rate_usd);
+
+// Other machines available in this city -> internal links that spread authority between pages.
+const relatedEquipment = (await getEquipmentInCity(db, state.code, cityParam)).filter((e) => e.id !== equipment.id);
+
+// ---- 4. SEO -----------------------------------------------------------------------------------
+const pagePath = `/rentals/${stateParam}/${cityParam}/${equipmentParam}`;
+const h1 = `${equipment.name} Rentals in ${cityName}, ${state.code}`;
+const title = `${equipment.name} Rental in ${cityName}, ${state.code} | ${range ? `${money(range.min)}–${money(range.max)}/Day` : 'Get a Quote'}`;
+const description = `Rent a ${equipment.name.toLowerCase()} in ${cityName}, ${state.name}. Compare ${localYards.length + nearbyYards.length} local rental yards${range ? `, typical rates ${money(range.min)}–${money(range.max)} per day` : ''}, and get a free quote.`;
+
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: new URL('/', Astro.site).toString() },
+      { '@type': 'ListItem', position: 2, name: state.name, item: new URL(`/rentals/${stateParam}`, Astro.site).toString() },
+      { '@type': 'ListItem', position: 3, name: cityName, item: new URL(`/rentals/${stateParam}/${cityParam}`, Astro.site).toString() },
+      { '@type': 'ListItem', position: 4, name: h1, item: new URL(pagePath, Astro.site).toString() },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  },
+];
+
+// ---- 5. Edge caching: cache rendered HTML at Cloudflare for a day, serve stale while revalidating
+Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
+---
+
+<Layout title={title} description={description} canonicalPath={pagePath} jsonLd={jsonLd}>
+  <!-- Hero: H1 + intro on the left, lead form ABOVE THE FOLD on the right -->
+  <section class="bg-gradient-to-b from-steel-900 to-steel-800 pb-12 pt-8 text-white">
+    <div class="mx-auto max-w-6xl px-4">
+      <nav aria-label="Breadcrumb" class="mb-6 text-sm text-slate-400">
+        <a href="/" class="hover:text-white">Home</a> ›
+        <a href={`/rentals/${stateParam}`} class="hover:text-white">{state.name}</a> ›
+        <a href={`/rentals/${stateParam}/${cityParam}`} class="hover:text-white">{cityName}</a> ›
+        <span class="text-slate-200">{equipment.name}</span>
+      </nav>
+
+      <div class="grid items-start gap-8 lg:grid-cols-5">
+        <div class="lg:col-span-3">
+          <p class="text-sm font-semibold uppercase tracking-wider text-brand-400">{equipment.category}</p>
+          <h1 class="mt-2 text-3xl font-extrabold leading-tight sm:text-4xl">{h1}</h1>
+
+          {range && (
+            <p class="mt-4 inline-block rounded-lg bg-white/10 px-4 py-2 text-lg">
+              The average cost to rent a {equipment.name} in {cityName} ranges from
+              <strong class="text-brand-400"> {money(range.min)}</strong> to
+              <strong class="text-brand-400"> {money(range.max)}</strong> per day.
+            </p>
+          )}
+
+          <div class="mt-5 space-y-3 text-slate-300">
+            {intro.slice(0, 2).map((p) => <p>{p}</p>)}
+          </div>
+        </div>
+
+        <div class="text-left text-slate-800 lg:col-span-2">
+          <LeadForm
+            equipmentName={equipment.name}
+            equipmentSlug={equipment.slug}
+            stateCode={state.code}
+            citySlug={cityParam}
+            cityName={cityName}
+            pagePath={pagePath}
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="mx-auto max-w-6xl space-y-14 px-4 pt-12">
+    <!-- About the machine -->
+    {intro[2] && (
+      <section>
+        <h2 class="text-2xl font-bold text-slate-900">About {equipment.name} Rentals</h2>
+        <p class="mt-3 max-w-3xl text-slate-700">{intro[2]}</p>
+      </section>
+    )}
+
+    <!-- Supplier directory -->
+    <section aria-labelledby="suppliers">
+      <h2 id="suppliers" class="text-2xl font-bold text-slate-900">
+        {equipment.name} Rental Yards Near {cityName}, {state.code}
+      </h2>
+
+      {localYards.length > 0 && (
+        <>
+          <h3 class="mt-5 text-sm font-semibold uppercase tracking-wide text-slate-500">In {cityName}</h3>
+          <div class="mt-3 grid gap-4 md:grid-cols-2">
+            {localYards.map((y) => <YardCard yard={y} />)}
+          </div>
+        </>
+      )}
+
+      {nearbyYards.length > 0 && (
+        <>
+          <h3 class="mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Nearby — delivers to {cityName}
+          </h3>
+          <div class="mt-3 grid gap-4 md:grid-cols-2">
+            {nearbyYards.map((y) => <YardCard yard={y} miles={y.miles} />)}
+          </div>
+        </>
+      )}
+    </section>
+
+    <!-- FAQs: <details> needs no JS and matches the FAQPage JSON-LD above -->
+    <section aria-labelledby="faq">
+      <h2 id="faq" class="text-2xl font-bold text-slate-900">
+        {equipment.name} Rental FAQs for {cityName}
+      </h2>
+      <div class="mt-4 divide-y divide-slate-200 rounded-xl bg-white ring-1 ring-slate-200">
+        {faqs.map((f, i) => (
+          <details class="group p-5" open={i === 0}>
+            <summary class="flex cursor-pointer list-none items-center justify-between font-semibold text-slate-900">
+              {f.q}
+              <span class="ml-4 text-brand-600 transition group-open:rotate-45">+</span>
+            </summary>
+            <p class="mt-3 text-slate-700">{f.a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+
+    <!-- Internal links: sibling machines in this city + city/state hubs -->
+    <section aria-labelledby="more">
+      <h2 id="more" class="text-2xl font-bold text-slate-900">More Equipment Rentals in {cityName}</h2>
+      <ul class="mt-4 flex flex-wrap gap-3">
+        {relatedEquipment.map((e) => (
+          <li>
+            <a
+              href={`/rentals/${stateParam}/${cityParam}/${e.slug}`}
+              class="inline-block rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-brand-50"
+            >
+              {e.name} Rental in {cityName}
+            </a>
+          </li>
+        ))}
+        <li>
+          <a href={`/rentals/${stateParam}/${cityParam}`} class="inline-block rounded-full bg-steel-900 px-4 py-2 text-sm font-medium text-white hover:bg-steel-800">
+            All {cityName} equipment →
+          </a>
+        </li>
+        <li>
+          <a href={`/rentals/${stateParam}`} class="inline-block rounded-full bg-steel-900 px-4 py-2 text-sm font-medium text-white hover:bg-steel-800">
+            All {state.name} rentals →
+          </a>
+        </li>
+      </ul>
+    </section>
+  </div>
+</Layout>

@@ -1,0 +1,144 @@
+---
+// src/components/LeadForm.astro — the money component. Posts to /api/lead.
+// Works without JS (plain form POST -> 303 redirect back with ?quote=sent) and is progressively
+// enhanced with fetch() below so the user stays on the page.
+interface Props {
+  equipmentName: string;
+  equipmentSlug: string;
+  stateCode: string;
+  citySlug: string;
+  cityName: string;
+  pagePath: string;
+}
+const { equipmentName, equipmentSlug, stateCode, citySlug, cityName, pagePath } = Astro.props;
+
+const today = new Date().toISOString().slice(0, 10);
+const durations = ['1 day', '2–3 days', '1 week', '2 weeks', '1 month', '2+ months'];
+const input =
+  'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30';
+const label = 'block text-sm font-medium text-slate-700';
+---
+
+<section id="quote" class="rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+  <h2 class="text-xl font-bold text-slate-900">
+    Need a {equipmentName} in {cityName}?
+  </h2>
+  <p class="mt-1 text-sm text-slate-600">
+    Get an instant quote from available local fleets. Free, no obligation.
+  </p>
+
+  <form id="lead-form" method="post" action="/api/lead" class="mt-5 space-y-4" novalidate>
+    <input type="hidden" name="equipment_slug" value={equipmentSlug} />
+    <input type="hidden" name="state" value={stateCode} />
+    <input type="hidden" name="city_slug" value={citySlug} />
+    <input type="hidden" name="page_path" value={pagePath} />
+    <input type="hidden" name="yard_id" id="lead-yard-id" value="" />
+    <!-- Honeypot: real users never see or fill this; bots do. -->
+    <div class="hidden" aria-hidden="true">
+      <label>Leave blank <input type="text" name="company_website" tabindex="-1" autocomplete="off" /></label>
+    </div>
+
+    <p id="lead-yard-note" class="hidden rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700"></p>
+
+    <div>
+      <label class={label} for="lead-name">Name</label>
+      <input class={input} id="lead-name" name="name" type="text" autocomplete="name" required />
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label class={label} for="lead-phone">Phone</label>
+        <input class={input} id="lead-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required />
+      </div>
+      <div>
+        <label class={label} for="lead-email">Email</label>
+        <input class={input} id="lead-email" name="email" type="email" autocomplete="email" required />
+      </div>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+      <div>
+        <label class={label} for="lead-zip">Delivery ZIP</label>
+        <input class={input} id="lead-zip" name="delivery_zip" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code" required />
+      </div>
+      <div>
+        <label class={label} for="lead-start">Project start date</label>
+        <input class={input} id="lead-start" name="start_date" type="date" min={today} required />
+      </div>
+      <div>
+        <label class={label} for="lead-duration">Estimated duration</label>
+        <select class={input} id="lead-duration" name="duration" required>
+          <option value="" disabled selected>Select…</option>
+          {durations.map((d) => <option value={d}>{d}</option>)}
+        </select>
+      </div>
+    </div>
+
+    <p id="lead-error" role="alert" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"></p>
+
+    <button
+      type="submit"
+      id="lead-submit"
+      class="w-full rounded-lg bg-brand-500 px-5 py-3 text-base font-bold text-steel-900 shadow transition hover:bg-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-500/40 disabled:opacity-60"
+    >
+      Get My Free Quote
+    </button>
+    <p class="text-center text-xs text-slate-500">
+      By submitting you agree to be contacted by equipment suppliers about this request.
+    </p>
+  </form>
+
+  <div id="lead-success" class="hidden py-8 text-center" role="status">
+    <p class="text-2xl font-bold text-slate-900">Request received ✓</p>
+    <p class="mt-2 text-slate-600">
+      Local {equipmentName.toLowerCase()} suppliers will reach out shortly with availability and pricing.
+    </p>
+  </div>
+</section>
+
+<script>
+  // Progressive enhancement: submit via fetch so the visitor keeps their place on the page.
+  const form = document.getElementById('lead-form') as HTMLFormElement | null;
+  if (form) {
+    const err = document.getElementById('lead-error')!;
+    const btn = document.getElementById('lead-submit') as HTMLButtonElement;
+    const ok = document.getElementById('lead-success')!;
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      err.classList.add('hidden');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          body: new FormData(form),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data as { error?: string }).error || 'Something went wrong.');
+        form.classList.add('hidden');
+        ok.classList.remove('hidden');
+      } catch (e) {
+        err.textContent = (e as Error).message;
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Get My Free Quote';
+      }
+    });
+
+    // "Request Quote Through Us" / "Book" buttons on yard cards pre-select that yard.
+    document.querySelectorAll<HTMLElement>('[data-request-yard]').forEach((el) => {
+      el.addEventListener('click', () => {
+        (document.getElementById('lead-yard-id') as HTMLInputElement).value = el.dataset.requestYard ?? '';
+        const note = document.getElementById('lead-yard-note')!;
+        note.textContent = `Your request will be sent to ${el.dataset.yardName ?? 'this supplier'} first.`;
+        note.classList.remove('hidden');
+      });
+    });
+  }
+</script>

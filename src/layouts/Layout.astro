@@ -1,0 +1,65 @@
+---
+// src/layouts/Layout.astro — shared shell: SEO <head>, header, footer.
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Path only, e.g. "/rentals/texas/austin". Used for canonical + og:url. */
+  canonicalPath?: string;
+  noindex?: boolean;
+  /** Extra JSON-LD objects (FAQPage, BreadcrumbList, ...) */
+  jsonLd?: object[];
+}
+
+const { title, description, canonicalPath, noindex = false, jsonLd = [] } = Astro.props;
+const site = Astro.site ?? new URL('https://rentlocalmachinery.com');
+const canonical = new URL(canonicalPath ?? Astro.url.pathname, site).toString();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RentLocalMachinery.com" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+
+    {jsonLd.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+  </head>
+  <body class="bg-slate-50 text-slate-800 antialiased font-sans">
+    <header class="bg-steel-900 text-white">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+        <a href="/" class="text-lg font-extrabold tracking-tight">
+          Rent<span class="text-brand-400">Local</span>Machinery
+        </a>
+        <nav class="text-sm text-slate-300">
+          <a href="/#states" class="hover:text-white">Browse by state</a>
+        </nav>
+      </div>
+    </header>
+
+    <main><slot /></main>
+
+    <footer class="mt-16 bg-steel-900 py-10 text-sm text-slate-400">
+      <div class="mx-auto max-w-6xl px-4">
+        <p class="font-semibold text-slate-200">RentLocalMachinery.com</p>
+        <p class="mt-2 max-w-2xl">
+          A directory and quote-request service connecting contractors and homeowners with independent
+          equipment rental yards across the United States. Prices shown are estimated averages;
+          final rates are set by each supplier.
+        </p>
+        <p class="mt-4">&copy; {new Date().getFullYear()} RentLocalMachinery.com</p>
+      </div>
+    </footer>
+  </body>
+</html>

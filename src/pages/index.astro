@@ -1,0 +1,59 @@
+---
+// Homepage: search hub, state-by-state index, featured equipment categories.
+import Layout from '../layouts/Layout.astro';
+import { getAllEquipment, getStatesWithYards } from '../lib/db';
+import { US_STATES, slugify } from '../lib/us-states';
+
+const db = Astro.locals.runtime.env.DB;
+const [equipment, activeStates] = await Promise.all([getAllEquipment(db), getStatesWithYards(db)]);
+const active = new Map(activeStates.map((s) => [s.state, s.yard_count]));
+
+const categories = [...new Set(equipment.map((e) => e.category))];
+Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+---
+
+<Layout
+  title="Rent Local Machinery | Heavy Equipment Rental Directory & Free Quotes"
+  description="Find and compare local heavy equipment rental yards across the U.S. Skid steers, excavators, boom lifts and more — get free quotes in minutes."
+>
+  <section class="bg-gradient-to-b from-steel-900 to-steel-800 py-16 text-white">
+    <div class="mx-auto max-w-4xl px-4 text-center">
+      <h1 class="text-4xl font-extrabold sm:text-5xl">Rent Heavy Machinery <span class="text-brand-400">Near You</span></h1>
+      <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
+        Compare independent rental yards, see typical daily rates and request free quotes for skid steers,
+        excavators, lifts and more.
+      </p>
+    </div>
+  </section>
+
+  <div class="mx-auto max-w-6xl space-y-14 px-4 py-12">
+    <section>
+      <h2 class="text-2xl font-bold text-slate-900">Featured equipment</h2>
+      <p class="mt-1 text-slate-600">Categories: {categories.join(' · ')}</p>
+      <ul class="mt-4 grid gap-3 sm:grid-cols-3">
+        {equipment.map((e) => (
+          <li class="rounded-xl bg-white p-5 ring-1 ring-slate-200">
+            <p class="text-xs font-semibold uppercase text-brand-700">{e.category}</p>
+            <p class="mt-1 text-lg font-bold text-slate-900">{e.name} Rental</p>
+            <p class="mt-1 line-clamp-3 text-sm text-slate-600">{e.description}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section id="states">
+      <h2 class="text-2xl font-bold text-slate-900">Browse by state</h2>
+      <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {US_STATES.map(([code, name]) => {
+          const count = active.get(code);
+          // Only link states that have data — avoids sending crawlers to 404s.
+          return count ? (
+            <li><a href={`/rentals/${slugify(name)}`} class="block rounded-lg bg-white px-3 py-2 font-medium ring-1 ring-slate-200 hover:ring-brand-500">{name} <span class="text-xs text-slate-500">({count})</span></a></li>
+          ) : (
+            <li class="rounded-lg px-3 py-2 text-slate-400">{name}</li>
+          );
+        })}
+      </ul>
+    </section>
+  </div>
+</Layout>
