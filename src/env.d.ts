@@ -6,6 +6,8 @@ type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
 
 interface Env {
   DB: D1Database;
+  /** Secret set in Cloudflare (Settings → Variables and Secrets). Protects /admin. */
+  ADMIN_PASSWORD?: string;
 }
 
 declare namespace App {

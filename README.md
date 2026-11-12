@@ -54,3 +54,8 @@ npm run db:import:local -- data/import-tx-austin.sql     # test copy
 npm run db:import:remote -- data/import-tx-austin.sql    # live site
 ```
 Add `--stocks skid-steer-rental,boom-lift-rental` only for machines you have verified yards stock.
+
+## Admin: upload yards by CSV (no terminal)
+Open `/admin`, log in with the `ADMIN_PASSWORD` secret (Cloudflare → project → Settings → Variables and Secrets),
+upload a CSV (template: `/yard-template.csv`). Yards are saved to D1 and linked to machines from the `equipment` column.
+For local testing put `ADMIN_PASSWORD=something-long` in a `.dev.vars` file (never commit it — it is in .gitignore).
