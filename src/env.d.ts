@@ -8,6 +8,10 @@ interface Env {
   DB: D1Database;
   /** Secret set in Cloudflare (Settings → Variables and Secrets). Protects /admin. */
   ADMIN_PASSWORD?: string;
+  /** Optional lead-alert emails (Resend). See src/lib/notify.ts */
+  RESEND_API_KEY?: string;
+  NOTIFY_EMAIL?: string;
+  NOTIFY_FROM?: string;
 }
 
 declare namespace App {

@@ -1,11 +1,11 @@
 ---
 // Homepage: search hub, state-by-state index, featured equipment categories.
 import Layout from '../layouts/Layout.astro';
-import { getAllEquipment, getStatesWithYards } from '../lib/db';
-import { US_STATES, slugify } from '../lib/us-states';
+import { getAllEquipment, getStatesWithYards, getTopCities } from '../lib/db';
+import { US_STATES, slugify, stateFromCode } from '../lib/us-states';
 
 const db = Astro.locals.runtime.env.DB;
-const [equipment, activeStates] = await Promise.all([getAllEquipment(db), getStatesWithYards(db)]);
+const [equipment, activeStates, topCities] = await Promise.all([getAllEquipment(db), getStatesWithYards(db), getTopCities(db, 12)]);
 const active = new Map(activeStates.map((s) => [s.state, s.yard_count]));
 
 const categories = [...new Set(equipment.map((e) => e.category))];
@@ -40,6 +40,20 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600,
         ))}
       </ul>
     </section>
+
+    {topCities.length > 0 && (
+      <section>
+        <h2 class="text-2xl font-bold text-slate-900">Popular cities</h2>
+        <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {topCities.map((c) => {
+            const st = stateFromCode(c.state);
+            return st && (
+              <li><a href={`/rentals/${st.slug}/${encodeURIComponent(c.slug)}`} class="block rounded-lg bg-white px-3 py-2 font-medium ring-1 ring-slate-200 hover:ring-brand-500">{c.city}, {c.state} <span class="text-xs text-slate-500">({c.yard_count})</span></a></li>
+            );
+          })}
+        </ul>
+      </section>
+    )}
 
     <section id="states">
       <h2 class="text-2xl font-bold text-slate-900">Browse by state</h2>

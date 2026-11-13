@@ -2,7 +2,7 @@
 // City hub: /rentals/:state/:city — lists all machinery rentable in the city and links to the money pages.
 import Layout from '../../../../layouts/Layout.astro';
 import YardCard from '../../../../components/YardCard.astro';
-import { getEquipmentInCity, getYardsInCity } from '../../../../lib/db';
+import { getCitiesInState, getEquipmentInCity, getYardsInCity } from '../../../../lib/db';
 import { stateFromSlug } from '../../../../lib/us-states';
 import { money, rateRange } from '../../../../lib/content';
 
@@ -11,10 +11,12 @@ const state = stateParam ? stateFromSlug(stateParam) : undefined;
 if (!state || !cityParam) return new Response(null, { status: 404 });
 
 const db = Astro.locals.runtime.env.DB;
-const [yards, equipment] = await Promise.all([
+const [yards, equipment, stateCities] = await Promise.all([
   getYardsInCity(db, state.code, cityParam),
   getEquipmentInCity(db, state.code, cityParam),
+  getCitiesInState(db, state.code),
 ]);
+const otherCities = stateCities.filter((c) => c.slug !== cityParam).slice(0, 12);
 if (yards.length === 0) return new Response(null, { status: 404 });
 
 const cityName = yards[0].city;
@@ -53,5 +55,16 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=86400
     <div class="mt-4 grid gap-4 md:grid-cols-2">
       {yards.map((y) => <YardCard yard={y} />)}
     </div>
+
+    {otherCities.length > 0 && (
+      <>
+        <h2 class="mt-12 text-2xl font-bold text-slate-900">Equipment rental in other {state.name} cities</h2>
+        <ul class="mt-4 flex flex-wrap gap-3">
+          {otherCities.map((c) => (
+            <li><a href={`/rentals/${stateParam}/${c.slug}`} class="inline-block rounded-full bg-white px-4 py-2 text-sm font-medium ring-1 ring-slate-300 hover:bg-brand-50">{c.city}</a></li>
+          ))}
+        </ul>
+      </>
+    )}
   </div>
 </Layout>

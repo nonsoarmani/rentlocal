@@ -1,6 +1,7 @@
 // src/pages/api/lead.ts — receives lead-form submissions and stores them in D1.
 import type { APIRoute } from 'astro';
 import { insertLead } from '../../lib/db';
+import { notifyNewLead } from '../../lib/notify';
 
 export const prerender = false;
 
@@ -52,7 +53,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return fail('We could not save your request. Please try again.', 500);
   }
 
-  // TODO (next step): notify partners/yards via email (e.g. Cloudflare Email Workers / Resend / Queues).
+  // Optional email alert to you (does nothing unless RESEND_API_KEY / NOTIFY_EMAIL / NOTIFY_FROM are set).
+  await notifyNewLead(
+    locals.runtime.env,
+    { name, phone, email, delivery_zip, start_date, duration, equipment_slug, state, city_slug },
+    new URL(request.url).origin,
+  );
   if (wantsJson) return json({ ok: true });
   // No-JS fallback: bounce back to the page the form was on.
   return new Response(null, { status: 303, headers: { Location: `${page_path || '/'}?quote=sent#quote` } });

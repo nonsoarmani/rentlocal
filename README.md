@@ -59,3 +59,11 @@ Add `--stocks skid-steer-rental,boom-lift-rental` only for machines you have ver
 Open `/admin`, log in with the `ADMIN_PASSWORD` secret (Cloudflare → project → Settings → Variables and Secrets),
 upload a CSV (template: `/yard-template.csv`). Yards are saved to D1 and linked to machines from the `equipment` column.
 For local testing put `ADMIN_PASSWORD=something-long` in a `.dev.vars` file (never commit it — it is in .gitignore).
+
+## Leads inbox (/admin/leads)
+Every quote request appears at `/admin/leads` with status, notes, matching yards and an "amount earned" field.
+Optional email alerts: set `RESEND_API_KEY` (secret), `NOTIFY_EMAIL`, `NOTIFY_FROM` in Cloudflare (see src/lib/notify.ts).
+
+## SEO
+`/sitemap.xml` (index) and `/sitemap/N.xml` are generated from the database. After deploying, submit
+`https://YOURDOMAIN/sitemap.xml` in Google Search Console and Bing Webmaster Tools.

@@ -102,6 +102,21 @@ export async function getCitiesInState(db: D1Database, stateCode: string) {
   return results;
 }
 
+/** Cities with the most yards across all states — used for homepage links. */
+export async function getTopCities(db: D1Database, limit = 12) {
+  const { results } = await db
+    .prepare(
+      `SELECT y.city AS city, y.state AS state, ${CITY_SLUG_SQL} AS slug, COUNT(*) AS yard_count
+         FROM rental_yards y
+        GROUP BY y.state, slug
+        ORDER BY yard_count DESC, city ASC
+        LIMIT ?`,
+    )
+    .bind(limit)
+    .all<{ city: string; state: string; slug: string; yard_count: number }>();
+  return results;
+}
+
 /** Equipment types stocked anywhere in a state, ranked by number of yards. */
 export async function getEquipmentInState(db: D1Database, stateCode: string) {
   const { results } = await db

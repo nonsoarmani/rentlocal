@@ -1,0 +1,18 @@
+---
+// Tabs shown at the top of every /admin page.
+interface Props { current: 'leads' | 'upload'; newLeads?: number }
+const { current, newLeads = 0 } = Astro.props;
+const tab = (active: boolean) =>
+  `rounded-lg px-4 py-2 text-sm font-semibold ${active ? 'bg-steel-900 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100'}`;
+---
+
+<nav class="mb-6 flex flex-wrap items-center gap-2" aria-label="Admin">
+  <a href="/admin/leads" class={tab(current === 'leads')}>
+    Leads {newLeads > 0 && <span class="ml-1 rounded-full bg-brand-500 px-2 py-0.5 text-xs font-bold text-steel-900">{newLeads} new</span>}
+  </a>
+  <a href="/admin" class={tab(current === 'upload')}>Upload yards</a>
+  <form method="post" action="/admin" class="ml-auto">
+    <input type="hidden" name="action" value="logout" />
+    <button class="text-sm text-slate-600 underline hover:text-slate-900">Log out</button>
+  </form>
+</nav>

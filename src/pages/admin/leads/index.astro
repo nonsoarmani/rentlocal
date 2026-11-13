@@ -1,0 +1,102 @@
+---
+// /admin/leads — inbox of quote requests with money stats.
+import Layout from '../../../layouts/Layout.astro';
+import AdminNav from '../../../components/AdminNav.astro';
+import { isAdmin } from '../../../lib/admin-guard';
+import { PAGE_SIZE, STATUSES, STATUS_LABEL, ensureLeadSchema, getLeadStats, listLeads } from '../../../lib/leads';
+import { titleCaseSlug } from '../../../lib/us-states';
+
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 'no-store');
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+
+const env = Astro.locals.runtime.env;
+if (!(await isAdmin(Astro.cookies, env))) return Astro.redirect('/admin');
+
+await ensureLeadSchema(env.DB);
+const statusParam = Astro.url.searchParams.get('status') ?? '';
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const [stats, { leads, total, filter }] = await Promise.all([
+  getLeadStats(env.DB),
+  listLeads(env.DB, statusParam, page),
+]);
+const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+const usd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+const badge: Record<string, string> = {
+  new: 'bg-brand-100 text-brand-700',
+  routed: 'bg-blue-100 text-blue-800',
+  won: 'bg-green-100 text-green-800',
+  lost: 'bg-slate-200 text-slate-700',
+  spam: 'bg-red-100 text-red-800',
+};
+const q = (extra: Record<string, string | number>) => {
+  const p = new URLSearchParams();
+  if (filter) p.set('status', filter);
+  for (const [k, v] of Object.entries(extra)) p.set(k, String(v));
+  return `/admin/leads?${p}`;
+};
+---
+
+<Layout title="Leads | Admin" description="Admin" noindex canonicalPath="/admin/leads">
+  <div class="mx-auto max-w-5xl px-4 py-10">
+    <AdminNav current="leads" newLeads={stats.byStatus.new ?? 0} />
+    <h1 class="text-2xl font-extrabold text-slate-900">Quote requests</h1>
+
+    <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {[
+        ['New (not handled)', stats.byStatus.new ?? 0],
+        ['Last 7 days', stats.last7],
+        ['Won', stats.byStatus.won ?? 0],
+        ['Revenue recorded', usd(stats.revenue)],
+      ].map(([label, value]) => (
+        <div class="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+          <p class="mt-1 text-2xl font-extrabold text-slate-900">{value}</p>
+        </div>
+      ))}
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-2 text-sm">
+      <a href="/admin/leads" class={`rounded-full px-3 py-1 ring-1 ring-slate-300 ${!filter ? 'bg-steel-900 text-white' : 'bg-white'}`}>All ({stats.total})</a>
+      {STATUSES.map((s) => (
+        <a href={`/admin/leads?status=${s}`} class={`rounded-full px-3 py-1 ring-1 ring-slate-300 ${filter === s ? 'bg-steel-900 text-white' : 'bg-white'}`}>
+          {STATUS_LABEL[s]} ({stats.byStatus[s] ?? 0})
+        </a>
+      ))}
+    </div>
+
+    {leads.length === 0 ? (
+      <p class="mt-8 rounded-xl bg-white p-8 text-center text-slate-600 ring-1 ring-slate-200">
+        No quote requests {filter ? 'with this status ' : ''}yet. They appear here the moment someone fills in the form on a rental page.
+      </p>
+    ) : (
+      <ul class="mt-4 space-y-3">
+        {leads.map((l) => (
+          <li>
+            <a href={`/admin/leads/${l.id}`} class="block rounded-xl bg-white p-4 ring-1 ring-slate-200 transition hover:ring-brand-500">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="font-bold text-slate-900">{l.equipment_name ?? l.equipment_slug} · {titleCaseSlug(l.city_slug)}, {l.state}</p>
+                <span class={`rounded-full px-3 py-0.5 text-xs font-semibold ${badge[l.status] ?? ''}`}>{STATUS_LABEL[l.status] ?? l.status}</span>
+              </div>
+              <p class="mt-1 text-sm text-slate-700">{l.name} · {l.phone} · {l.email}</p>
+              <p class="mt-1 text-xs text-slate-500">
+                {l.created_at} UTC · starts {l.start_date} · {l.duration}
+                {l.requested_yard_name && <> · asked for <strong>{l.requested_yard_name}</strong></>}
+                {l.routed_yard_name && <> · sent to <strong>{l.routed_yard_name}</strong></>}
+                {l.sale_amount_usd != null && <> · <strong>{usd(l.sale_amount_usd)}</strong></>}
+              </p>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+
+    {pages > 1 && (
+      <div class="mt-6 flex items-center justify-between text-sm">
+        {page > 1 ? <a class="underline" href={q({ page: page - 1 })}>← Newer</a> : <span />}
+        <span class="text-slate-500">Page {page} of {pages}</span>
+        {page < pages ? <a class="underline" href={q({ page: page + 1 })}>Older →</a> : <span />}
+      </div>
+    )}
+  </div>
+</Layout>
