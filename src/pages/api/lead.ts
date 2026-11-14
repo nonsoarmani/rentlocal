@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { insertLead } from '../../lib/db';
 import { notifyNewLead } from '../../lib/notify';
 import { ensureLeadSchema } from '../../lib/leads';
+import { slugify } from '../../lib/us-states';
 
 export const prerender = false;
 
@@ -31,7 +32,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const duration = clean(form.get('duration'), 30);
   const equipment_slug = clean(form.get('equipment_slug'), 100);
   const state = clean(form.get('state'), 2).toUpperCase();
-  const city_slug = clean(form.get('city_slug'), 100);
+  // City comes from a hidden field (city/machine pages) or a typed box (state pages)
+  const city_slug = clean(form.get('city_slug'), 100) || slugify(clean(form.get('city_text'), 60));
   const page_path = clean(form.get('page_path'), 300);
   const yardRaw = clean(form.get('yard_id'), 12);
 

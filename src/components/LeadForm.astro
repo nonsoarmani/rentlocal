@@ -10,14 +10,16 @@ interface Props {
   equipmentSlug?: string;
   equipmentOptions?: Option[];
   citySlug?: string;
+  /** State page: ask the visitor to type their city (suggestions come from cityOptions). */
+  askCity?: boolean;
   cityOptions?: Option[];
   stateCode: string;
   placeLabel: string; // "Austin" or "Texas" — used in the heading
   pagePath: string;
 }
-const { equipmentName = '', equipmentSlug = '', equipmentOptions = [], citySlug = '', cityOptions = [], stateCode, placeLabel, pagePath } = Astro.props;
+const { equipmentName = '', equipmentSlug = '', equipmentOptions = [], citySlug = '', askCity = false, cityOptions = [], stateCode, placeLabel, pagePath } = Astro.props;
 const chooseMachine = equipmentOptions.length > 0;
-const chooseCity = cityOptions.length > 0;
+const chooseCity = askCity;
 
 const today = new Date().toISOString().slice(0, 10);
 const durations = ['1 day', '2–3 days', '1 week', '2 weeks', '1 month', '2+ months'];
@@ -46,11 +48,11 @@ const label = 'block text-sm font-medium text-slate-700';
 
     {chooseCity && (
       <div>
-        <label class={label} for="lead-city">City</label>
-        <select class={input} id="lead-city" name="city_slug" required>
-          <option value="" disabled selected>Select your city…</option>
-          {cityOptions.map((c) => <option value={c.slug}>{c.name}</option>)}
-        </select>
+        <label class={label} for="lead-city">Your city</label>
+        <input class={input} id="lead-city" name="city_text" type="text" list="lead-city-list" maxlength="60" autocomplete="address-level2" placeholder="Start typing your city" required />
+        <datalist id="lead-city-list">
+          {cityOptions.map((c) => <option value={c.name} />)}
+        </datalist>
       </div>
     )}
     {chooseMachine && (

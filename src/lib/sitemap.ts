@@ -1,13 +1,12 @@
 // src/lib/sitemap.ts — builds the list of every indexable URL straight from the database.
 // Lists every page that exists: each state and city we cover, and every machine page for those cities.
-import { stateFromCode } from './us-states';
+import { US_STATES, slugify, stateFromCode } from './us-states';
 
 export const URLS_PER_SITEMAP = 10000; // Google's limit is 50,000; smaller files are quicker to fetch
 
 export async function buildUrlList(db: D1Database): Promise<string[]> {
   const seg = encodeURIComponent;
-  const [states, cities, combos] = await Promise.all([
-    db.prepare('SELECT DISTINCT state FROM rental_yards ORDER BY state').all<{ state: string }>(),
+  const [cities, combos] = await Promise.all([
     db
       .prepare("SELECT DISTINCT state, lower(replace(city, ' ', '-')) AS city FROM rental_yards ORDER BY state, city")
       .all<{ state: string; city: string }>(),
@@ -22,10 +21,7 @@ export async function buildUrlList(db: D1Database): Promise<string[]> {
   ]);
 
   const urls: string[] = ['/'];
-  for (const { state } of states.results) {
-    const st = stateFromCode(state);
-    if (st) urls.push(`/rentals/${st.slug}`);
-  }
+  for (const [, name] of US_STATES) urls.push(`/rentals/${slugify(name)}`); // every state page exists
   for (const { state, city } of cities.results) {
     const st = stateFromCode(state);
     if (st) urls.push(`/rentals/${st.slug}/${seg(city)}`);

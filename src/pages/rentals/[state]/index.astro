@@ -12,7 +12,6 @@ if (!state) return new Response(null, { status: 404 });
 
 const db = Astro.locals.runtime.env.DB;
 const [cities, equipment] = await Promise.all([getCitiesInState(db, state.code), getAllEquipment(db)]);
-if (cities.length === 0) return new Response(null, { status: 404 });
 
 const pagePath = `/rentals/${stateParam}`;
 Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
@@ -46,17 +45,23 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=86400
           })}
         </ul>
 
-        <h2 class="mt-10 text-2xl font-bold text-slate-900">Cities in {state.name}</h2>
-        <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {cities.map((c) => (
-            <li><a href={`/rentals/${stateParam}/${c.slug}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{c.city}</a></li>
-          ))}
-        </ul>
+        {cities.length > 0 && (
+          <>
+            <h2 class="mt-10 text-2xl font-bold text-slate-900">Cities in {state.name}</h2>
+            <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {cities.map((c) => (
+                <li><a href={`/rentals/${stateParam}/${c.slug}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{c.city}</a></li>
+              ))}
+            </ul>
+          </>
+        )}
+        <p class="mt-8 text-slate-700">Don't see your city? No problem. Type it into the form and we'll find suppliers near you.</p>
       </div>
 
       <div class="lg:col-span-2">
         <LeadForm
           equipmentOptions={equipment.map((e) => ({ slug: e.slug, name: e.name }))}
+          askCity
           cityOptions={cities.map((c) => ({ slug: c.slug, name: c.city }))}
           stateCode={state.code}
           placeLabel={state.name}

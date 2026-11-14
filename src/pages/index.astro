@@ -1,13 +1,12 @@
 ---
 // Homepage: explain the service, link to states and popular cities.
 import Layout from '../layouts/Layout.astro';
-import { getAllEquipment, getStatesWithYards, getTopCities } from '../lib/db';
+import { getAllEquipment, getTopCities } from '../lib/db';
 import { US_STATES, slugify, stateFromCode } from '../lib/us-states';
 import { money, rateRange } from '../lib/content';
 
 const db = Astro.locals.runtime.env.DB;
-const [equipment, activeStates, topCities] = await Promise.all([getAllEquipment(db), getStatesWithYards(db), getTopCities(db, 12)]);
-const active = new Set(activeStates.map((s) => s.state));
+const [equipment, topCities] = await Promise.all([getAllEquipment(db), getTopCities(db, 12)]);
 Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
 ---
 
@@ -69,13 +68,9 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600,
     <section id="states">
       <h2 class="text-2xl font-bold text-slate-900">Browse by state</h2>
       <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {US_STATES.map(([code, name]) =>
-          active.has(code) ? (
-            <li><a href={`/rentals/${slugify(name)}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{name}</a></li>
-          ) : (
-            <li class="rounded-lg px-3 py-2 text-slate-400">{name}</li>
-          ),
-        )}
+        {US_STATES.map(([, name]) => (
+          <li><a href={`/rentals/${slugify(name)}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{name}</a></li>
+        ))}
       </ul>
     </section>
   </div>
