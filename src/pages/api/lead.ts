@@ -2,6 +2,7 @@
 import type { APIRoute } from 'astro';
 import { insertLead } from '../../lib/db';
 import { notifyNewLead } from '../../lib/notify';
+import { ensureLeadSchema } from '../../lib/leads';
 
 export const prerender = false;
 
@@ -19,6 +20,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   // Honeypot: pretend success so bots don't learn they were caught.
   if (clean(form.get('company_website'))) return wantsJson ? json({ ok: true }) : new Response(null, { status: 204 });
+
+  if (form.get('consent') !== 'on') return fail('Please tick the box to agree to be contacted about your request.');
 
   const name = clean(form.get('name'), 100);
   const phone = clean(form.get('phone'), 30);
@@ -43,6 +46,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.runtime.env.DB;
 
   try {
+    await ensureLeadSchema(db);
     await insertLead(db, {
       name, phone, email, delivery_zip, start_date, duration,
       equipment_slug, state, city_slug, yard_id,

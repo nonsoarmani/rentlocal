@@ -61,6 +61,7 @@ export async function ensureLeadSchema(db: D1Database): Promise<void> {
     ['sale_amount_usd', 'REAL'],
     ['routed_to_yard_id', 'INTEGER'],
     ['updated_at', 'TEXT'],
+    ['consent_at', 'TEXT'], // when the visitor ticked the "contact me" consent box
   ];
   for (const [col, type] of wanted) {
     if (!have.has(col)) await db.prepare(`ALTER TABLE leads ADD COLUMN ${col} ${type}`).run();

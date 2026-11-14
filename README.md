@@ -67,3 +67,9 @@ Optional email alerts: set `RESEND_API_KEY` (secret), `NOTIFY_EMAIL`, `NOTIFY_FR
 ## SEO
 `/sitemap.xml` (index) and `/sitemap/N.xml` are generated from the database. After deploying, submit
 `https://YOURDOMAIN/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+
+## Lead-gen mode
+The public site shows no supplier listings: only typical price ranges, helpful details and a quote form (with a
+consent checkbox that is stored with each lead). The `rental_yards` data is private: it decides which cities get
+pages and who a lead can be sent to in /admin/leads. Pages exist for every city that has at least one yard row,
+for every machine type.

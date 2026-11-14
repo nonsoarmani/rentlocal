@@ -1,51 +1,68 @@
 ---
-// State hub: /rentals/:state — major cities and top equipment types in the state.
+// State page: /rentals/:state — pick a city, see typical prices, request quotes.
 import Layout from '../../../layouts/Layout.astro';
-import { getCitiesInState, getEquipmentInState } from '../../../lib/db';
+import LeadForm from '../../../components/LeadForm.astro';
+import { getAllEquipment, getCitiesInState } from '../../../lib/db';
 import { stateFromSlug } from '../../../lib/us-states';
+import { money, rateRange } from '../../../lib/content';
 
 const { state: stateParam } = Astro.params;
 const state = stateParam ? stateFromSlug(stateParam) : undefined;
 if (!state) return new Response(null, { status: 404 });
 
 const db = Astro.locals.runtime.env.DB;
-const [cities, equipment] = await Promise.all([
-  getCitiesInState(db, state.code),
-  getEquipmentInState(db, state.code),
-]);
+const [cities, equipment] = await Promise.all([getCitiesInState(db, state.code), getAllEquipment(db)]);
 if (cities.length === 0) return new Response(null, { status: 404 });
 
+const pagePath = `/rentals/${stateParam}`;
 Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
 ---
 
 <Layout
-  title={`Equipment Rental in ${state.name} | Local Heavy Machinery Rentals`}
-  description={`Find heavy equipment rental yards across ${state.name}. Browse ${cities.length} cities and ${equipment.length} equipment types, compare local suppliers and get free quotes.`}
+  title={`Equipment Rental in ${state.name}: Prices & Free Quotes`}
+  description={`Rent heavy equipment anywhere in ${state.name}. See typical daily rates for ${equipment.map((e) => e.name.toLowerCase()).join(', ')} and get free quotes from local rental suppliers.`}
+  canonicalPath={pagePath}
 >
   <div class="mx-auto max-w-6xl px-4 py-10">
     <nav class="text-sm text-slate-500"><a href="/" class="hover:underline">Home</a> › {state.name}</nav>
-    <h1 class="mt-3 text-3xl font-extrabold text-slate-900">Heavy Equipment Rentals in {state.name}</h1>
+    <div class="mt-4 grid items-start gap-8 lg:grid-cols-5">
+      <div class="lg:col-span-3">
+        <h1 class="text-3xl font-extrabold text-slate-900">Heavy Equipment Rental in {state.name}</h1>
+        <p class="mt-3 text-slate-700">
+          Renting equipment in {state.name}? Choose your city to see typical prices, or use the form to request quotes
+          from local rental suppliers.
+        </p>
 
-    <h2 class="mt-10 text-2xl font-bold text-slate-900">Cities in {state.name}</h2>
-    <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {cities.map((c) => (
-        <li>
-          <a href={`/rentals/${stateParam}/${c.slug}`} class="block rounded-lg bg-white px-4 py-3 ring-1 ring-slate-200 hover:ring-brand-500">
-            <span class="font-semibold text-slate-900">{c.city}, {state.code}</span>
-            <span class="block text-xs text-slate-500">{c.yard_count} rental {c.yard_count === 1 ? 'yard' : 'yards'}</span>
-          </a>
-        </li>
-      ))}
-    </ul>
+        <h2 class="mt-8 text-2xl font-bold text-slate-900">Typical daily rental rates in {state.name}</h2>
+        <ul class="mt-4 grid gap-3 sm:grid-cols-3">
+          {equipment.map((e) => {
+            const r = rateRange(e.avg_daily_rate_usd);
+            return (
+              <li class="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                <p class="font-bold text-slate-900">{e.name}</p>
+                {r && <p class="text-sm text-slate-600">{money(r.min)}–{money(r.max)} / day</p>}
+              </li>
+            );
+          })}
+        </ul>
 
-    <h2 class="mt-12 text-2xl font-bold text-slate-900">Top equipment in {state.name}</h2>
-    <p class="mt-2 text-slate-600">Pick a city above to see local pricing and suppliers for each machine.</p>
-    <ul class="mt-4 flex flex-wrap gap-3">
-      {equipment.map((e) => (
-        <li class="rounded-full bg-white px-4 py-2 text-sm font-medium ring-1 ring-slate-300">
-          {e.name} <span class="text-slate-500">· {e.yard_count} {e.yard_count === 1 ? 'yard' : 'yards'}</span>
-        </li>
-      ))}
-    </ul>
+        <h2 class="mt-10 text-2xl font-bold text-slate-900">Cities in {state.name}</h2>
+        <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {cities.map((c) => (
+            <li><a href={`/rentals/${stateParam}/${c.slug}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{c.city}</a></li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="lg:col-span-2">
+        <LeadForm
+          equipmentOptions={equipment.map((e) => ({ slug: e.slug, name: e.name }))}
+          cityOptions={cities.map((c) => ({ slug: c.slug, name: c.city }))}
+          stateCode={state.code}
+          placeLabel={state.name}
+          pagePath={pagePath}
+        />
+      </div>
+    </div>
   </div>
 </Layout>

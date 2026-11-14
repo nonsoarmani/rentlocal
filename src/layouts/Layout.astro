@@ -54,15 +54,11 @@ const canonical = new URL(canonicalPath ?? Astro.url.pathname, site).toString();
       <div class="mx-auto max-w-6xl px-4">
         <p class="font-semibold text-slate-200">RentLocalMachinery.com</p>
         <p class="mt-2 max-w-2xl">
-          A directory and quote-request service connecting contractors and homeowners with independent
-          equipment rental yards across the United States. Prices shown are estimated averages;
+          A quote-request service helping contractors and homeowners get equipment rental quotes from independent
+          local suppliers across the United States. We are not a rental company. Prices shown are estimates;
           final rates are set by each supplier.
         </p>
-        <p class="mt-3">
-          Some listing data &copy;
-          <a href="https://www.openstreetmap.org/copyright" class="underline hover:text-white" rel="noopener">OpenStreetMap contributors</a>,
-          available under the Open Database License.
-        </p>
+        <p class="mt-3"><a href="/privacy" class="underline hover:text-white">Privacy Policy</a> · <a href="/terms" class="underline hover:text-white">Terms of Use</a></p>
         <p class="mt-4">&copy; {new Date().getFullYear()} RentLocalMachinery.com</p>
       </div>
     </footer>

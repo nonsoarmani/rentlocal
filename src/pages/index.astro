@@ -1,44 +1,55 @@
 ---
-// Homepage: search hub, state-by-state index, featured equipment categories.
+// Homepage: explain the service, link to states and popular cities.
 import Layout from '../layouts/Layout.astro';
 import { getAllEquipment, getStatesWithYards, getTopCities } from '../lib/db';
 import { US_STATES, slugify, stateFromCode } from '../lib/us-states';
+import { money, rateRange } from '../lib/content';
 
 const db = Astro.locals.runtime.env.DB;
 const [equipment, activeStates, topCities] = await Promise.all([getAllEquipment(db), getStatesWithYards(db), getTopCities(db, 12)]);
-const active = new Map(activeStates.map((s) => [s.state, s.yard_count]));
-
-const categories = [...new Set(equipment.map((e) => e.category))];
+const active = new Set(activeStates.map((s) => s.state));
 Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
 ---
 
 <Layout
-  title="Rent Local Machinery | Heavy Equipment Rental Directory & Free Quotes"
-  description="Find and compare local heavy equipment rental yards across the U.S. Skid steers, excavators, boom lifts and more — get free quotes in minutes."
+  title="Equipment Rental Quotes: Compare Local Prices | RentLocalMachinery"
+  description="Get free quotes for skid steer, mini excavator and boom lift rentals in your city. See typical daily rates and let local suppliers come to you."
 >
   <section class="bg-gradient-to-b from-steel-900 to-steel-800 py-16 text-white">
     <div class="mx-auto max-w-4xl px-4 text-center">
-      <h1 class="text-4xl font-extrabold sm:text-5xl">Rent Heavy Machinery <span class="text-brand-400">Near You</span></h1>
+      <h1 class="text-4xl font-extrabold sm:text-5xl">Equipment Rental Quotes, <span class="text-brand-400">Fast</span></h1>
       <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
-        Compare independent rental yards, see typical daily rates and request free quotes for skid steers,
-        excavators, lifts and more.
+        Pick your state and city to see typical daily rental rates, then send one request and get quotes from local suppliers.
       </p>
+      <a href="#states" class="mt-8 inline-block rounded-lg bg-brand-500 px-6 py-3 font-bold text-steel-900 hover:bg-brand-400">Find my city</a>
     </div>
   </section>
 
   <div class="mx-auto max-w-6xl space-y-14 px-4 py-12">
     <section>
-      <h2 class="text-2xl font-bold text-slate-900">Featured equipment</h2>
-      <p class="mt-1 text-slate-600">Categories: {categories.join(' · ')}</p>
+      <h2 class="text-2xl font-bold text-slate-900">Typical daily rates</h2>
       <ul class="mt-4 grid gap-3 sm:grid-cols-3">
-        {equipment.map((e) => (
-          <li class="rounded-xl bg-white p-5 ring-1 ring-slate-200">
-            <p class="text-xs font-semibold uppercase text-brand-700">{e.category}</p>
-            <p class="mt-1 text-lg font-bold text-slate-900">{e.name} Rental</p>
-            <p class="mt-1 line-clamp-3 text-sm text-slate-600">{e.description}</p>
-          </li>
-        ))}
+        {equipment.map((e) => {
+          const r = rateRange(e.avg_daily_rate_usd);
+          return (
+            <li class="rounded-xl bg-white p-5 ring-1 ring-slate-200">
+              <p class="text-xs font-semibold uppercase text-brand-700">{e.category}</p>
+              <p class="mt-1 text-lg font-bold text-slate-900">{e.name} Rental</p>
+              {r && <p class="text-slate-800">{money(r.min)}–{money(r.max)} <span class="text-sm text-slate-500">per day (estimate)</span></p>}
+              <p class="mt-2 line-clamp-3 text-sm text-slate-600">{e.description}</p>
+            </li>
+          );
+        })}
       </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-slate-900">How it works</h2>
+      <ol class="mt-4 grid gap-4 sm:grid-cols-3">
+        <li class="rounded-xl bg-white p-5 ring-1 ring-slate-200"><p class="font-bold">1. Tell us what you need</p><p class="mt-1 text-sm text-slate-600">Choose your city and machine, add your dates and delivery ZIP.</p></li>
+        <li class="rounded-xl bg-white p-5 ring-1 ring-slate-200"><p class="font-bold">2. We contact suppliers</p><p class="mt-1 text-sm text-slate-600">We reach out to local equipment rental suppliers on your behalf.</p></li>
+        <li class="rounded-xl bg-white p-5 ring-1 ring-slate-200"><p class="font-bold">3. Compare and choose</p><p class="mt-1 text-sm text-slate-600">You get availability and pricing and pick the best offer. Free, no obligation.</p></li>
+      </ol>
     </section>
 
     {topCities.length > 0 && (
@@ -48,7 +59,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600,
           {topCities.map((c) => {
             const st = stateFromCode(c.state);
             return st && (
-              <li><a href={`/rentals/${st.slug}/${encodeURIComponent(c.slug)}`} class="block rounded-lg bg-white px-3 py-2 font-medium ring-1 ring-slate-200 hover:ring-brand-500">{c.city}, {c.state} <span class="text-xs text-slate-500">({c.yard_count})</span></a></li>
+              <li><a href={`/rentals/${st.slug}/${encodeURIComponent(c.slug)}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{c.city}, {c.state}</a></li>
             );
           })}
         </ul>
@@ -58,15 +69,13 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=300, s-maxage=3600,
     <section id="states">
       <h2 class="text-2xl font-bold text-slate-900">Browse by state</h2>
       <ul class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {US_STATES.map(([code, name]) => {
-          const count = active.get(code);
-          // Only link states that have data — avoids sending crawlers to 404s.
-          return count ? (
-            <li><a href={`/rentals/${slugify(name)}`} class="block rounded-lg bg-white px-3 py-2 font-medium ring-1 ring-slate-200 hover:ring-brand-500">{name} <span class="text-xs text-slate-500">({count})</span></a></li>
+        {US_STATES.map(([code, name]) =>
+          active.has(code) ? (
+            <li><a href={`/rentals/${slugify(name)}`} class="block rounded-lg bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-200 hover:ring-brand-500">{name}</a></li>
           ) : (
             <li class="rounded-lg px-3 py-2 text-slate-400">{name}</li>
-          );
-        })}
+          ),
+        )}
       </ul>
     </section>
   </div>

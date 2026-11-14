@@ -1,6 +1,5 @@
 // src/lib/sitemap.ts — builds the list of every indexable URL straight from the database.
-// Only pages that really exist are listed (a state with yards, a city with yards, a machine that a
-// yard in that city stocks), so Google is never sent to an empty page.
+// Lists every page that exists: each state and city we cover, and every machine page for those cities.
 import { stateFromCode } from './us-states';
 
 export const URLS_PER_SITEMAP = 10000; // Google's limit is 50,000; smaller files are quicker to fetch
@@ -14,11 +13,10 @@ export async function buildUrlList(db: D1Database): Promise<string[]> {
       .all<{ state: string; city: string }>(),
     db
       .prepare(
-        `SELECT DISTINCT y.state AS state, lower(replace(y.city, ' ', '-')) AS city, e.slug AS equipment
-           FROM yard_inventory yi
-           JOIN rental_yards y    ON y.id = yi.yard_id
-           JOIN equipment_types e ON e.id = yi.equipment_id
-          ORDER BY y.state, city, e.slug`,
+        `SELECT c.state AS state, c.city AS city, e.slug AS equipment
+           FROM (SELECT DISTINCT state, lower(replace(city, ' ', '-')) AS city FROM rental_yards) c
+           CROSS JOIN equipment_types e
+          ORDER BY c.state, c.city, e.slug`,
       )
       .all<{ state: string; city: string; equipment: string }>(),
   ]);

@@ -70,6 +70,15 @@ export async function getYardsStockingInState(db: D1Database, equipmentId: numbe
   return results;
 }
 
+/** Display name of a city ("Round Rock") from its URL slug, or null if we have no data for it. */
+export async function getCityName(db: D1Database, stateCode: string, citySlug: string) {
+  const r = await db
+    .prepare(`SELECT y.city AS city FROM rental_yards y WHERE y.state = ? AND ${CITY_SLUG_SQL} = ? LIMIT 1`)
+    .bind(stateCode, citySlug)
+    .first<{ city: string }>();
+  return r?.city ?? null;
+}
+
 /** Equipment types available in a city, with the number of local yards stocking each. */
 export async function getEquipmentInCity(db: D1Database, stateCode: string, citySlug: string) {
   const { results } = await db
@@ -94,7 +103,7 @@ export async function getCitiesInState(db: D1Database, stateCode: string) {
       `SELECT y.city AS city, ${CITY_SLUG_SQL} AS slug, COUNT(*) AS yard_count
          FROM rental_yards y
         WHERE y.state = ?
-        GROUP BY slug
+        GROUP BY ${CITY_SLUG_SQL}
         ORDER BY yard_count DESC, city ASC`,
     )
     .bind(stateCode)
@@ -108,7 +117,7 @@ export async function getTopCities(db: D1Database, limit = 12) {
     .prepare(
       `SELECT y.city AS city, y.state AS state, ${CITY_SLUG_SQL} AS slug, COUNT(*) AS yard_count
          FROM rental_yards y
-        GROUP BY y.state, slug
+        GROUP BY y.state, ${CITY_SLUG_SQL}
         ORDER BY yard_count DESC, city ASC
         LIMIT ?`,
     )
@@ -160,8 +169,8 @@ export async function insertLead(db: D1Database, l: LeadInput) {
   return db
     .prepare(
       `INSERT INTO leads (name, phone, email, delivery_zip, start_date, duration,
-                          equipment_slug, state, city_slug, yard_id, page_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          equipment_slug, state, city_slug, yard_id, page_url, consent_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     )
     .bind(l.name, l.phone, l.email, l.delivery_zip, l.start_date, l.duration,
           l.equipment_slug, l.state, l.city_slug, l.yard_id, l.page_url)

@@ -1,16 +1,23 @@
 ---
-// src/components/LeadForm.astro — the money component. Posts to /api/lead.
-// Works without JS (plain form POST -> 303 redirect back with ?quote=sent) and is progressively
-// enhanced with fetch() below so the user stays on the page.
+// src/components/LeadForm.astro — the quote request form (the money component). Posts to /api/lead.
+// Works without JS (plain POST -> 303 redirect back) and is enhanced with fetch() below.
+//  - Machine page: machine + city are fixed (hidden fields).
+//  - City page: visitor picks the machine.
+//  - State page: visitor picks the city and the machine.
+interface Option { slug: string; name: string }
 interface Props {
-  equipmentName: string;
-  equipmentSlug: string;
+  equipmentName?: string;
+  equipmentSlug?: string;
+  equipmentOptions?: Option[];
+  citySlug?: string;
+  cityOptions?: Option[];
   stateCode: string;
-  citySlug: string;
-  cityName: string;
+  placeLabel: string; // "Austin" or "Texas" — used in the heading
   pagePath: string;
 }
-const { equipmentName, equipmentSlug, stateCode, citySlug, cityName, pagePath } = Astro.props;
+const { equipmentName = '', equipmentSlug = '', equipmentOptions = [], citySlug = '', cityOptions = [], stateCode, placeLabel, pagePath } = Astro.props;
+const chooseMachine = equipmentOptions.length > 0;
+const chooseCity = cityOptions.length > 0;
 
 const today = new Date().toISOString().slice(0, 10);
 const durations = ['1 day', '2–3 days', '1 week', '2 weeks', '1 month', '2+ months'];
@@ -21,24 +28,40 @@ const label = 'block text-sm font-medium text-slate-700';
 
 <section id="quote" class="rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
   <h2 class="text-xl font-bold text-slate-900">
-    Need a {equipmentName} in {cityName}?
+    {equipmentName ? `Need a ${equipmentName} in ${placeLabel}?` : `Get equipment rental quotes in ${placeLabel}`}
   </h2>
   <p class="mt-1 text-sm text-slate-600">
-    Get an instant quote from available local fleets. Free, no obligation.
+    Tell us what you need and we'll get quotes from local rental suppliers. Free, no obligation.
   </p>
 
   <form id="lead-form" method="post" action="/api/lead" class="mt-5 space-y-4" novalidate>
-    <input type="hidden" name="equipment_slug" value={equipmentSlug} />
+    {!chooseMachine && <input type="hidden" name="equipment_slug" value={equipmentSlug} />}
+    {!chooseCity && <input type="hidden" name="city_slug" value={citySlug} />}
     <input type="hidden" name="state" value={stateCode} />
-    <input type="hidden" name="city_slug" value={citySlug} />
     <input type="hidden" name="page_path" value={pagePath} />
-    <input type="hidden" name="yard_id" id="lead-yard-id" value="" />
     <!-- Honeypot: real users never see or fill this; bots do. -->
     <div class="hidden" aria-hidden="true">
       <label>Leave blank <input type="text" name="company_website" tabindex="-1" autocomplete="off" /></label>
     </div>
 
-    <p id="lead-yard-note" class="hidden rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700"></p>
+    {chooseCity && (
+      <div>
+        <label class={label} for="lead-city">City</label>
+        <select class={input} id="lead-city" name="city_slug" required>
+          <option value="" disabled selected>Select your city…</option>
+          {cityOptions.map((c) => <option value={c.slug}>{c.name}</option>)}
+        </select>
+      </div>
+    )}
+    {chooseMachine && (
+      <div>
+        <label class={label} for="lead-equipment">What do you need?</label>
+        <select class={input} id="lead-equipment" name="equipment_slug" required>
+          <option value="" disabled selected>Select a machine…</option>
+          {equipmentOptions.map((e) => <option value={e.slug}>{e.name}</option>)}
+        </select>
+      </div>
+    )}
 
     <div>
       <label class={label} for="lead-name">Name</label>
@@ -74,6 +97,15 @@ const label = 'block text-sm font-medium text-slate-700';
       </div>
     </div>
 
+    <label class="flex items-start gap-2 text-xs text-slate-600">
+      <input type="checkbox" name="consent" id="lead-consent" required class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300" />
+      <span>
+        I agree to be contacted by phone, text or email by RentLocalMachinery and equipment rental suppliers about this
+        request. Consent is not a condition of renting. See our <a href="/privacy" class="underline">Privacy Policy</a>
+        and <a href="/terms" class="underline">Terms</a>.
+      </span>
+    </label>
+
     <p id="lead-error" role="alert" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"></p>
 
     <button
@@ -81,18 +113,13 @@ const label = 'block text-sm font-medium text-slate-700';
       id="lead-submit"
       class="w-full rounded-lg bg-brand-500 px-5 py-3 text-base font-bold text-steel-900 shadow transition hover:bg-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-500/40 disabled:opacity-60"
     >
-      Get My Free Quote
+      Get My Free Quotes
     </button>
-    <p class="text-center text-xs text-slate-500">
-      By submitting you agree to be contacted by equipment suppliers about this request.
-    </p>
   </form>
 
   <div id="lead-success" class="hidden py-8 text-center" role="status">
     <p class="text-2xl font-bold text-slate-900">Request received ✓</p>
-    <p class="mt-2 text-slate-600">
-      Local {equipmentName.toLowerCase()} suppliers will reach out shortly with availability and pricing.
-    </p>
+    <p class="mt-2 text-slate-600">We'll contact local suppliers and get quotes back to you shortly.</p>
   </div>
 </section>
 
@@ -103,7 +130,6 @@ const label = 'block text-sm font-medium text-slate-700';
     const err = document.getElementById('lead-error')!;
     const btn = document.getElementById('lead-submit') as HTMLButtonElement;
     const ok = document.getElementById('lead-success')!;
-
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       err.classList.add('hidden');
@@ -114,11 +140,7 @@ const label = 'block text-sm font-medium text-slate-700';
       btn.disabled = true;
       btn.textContent = 'Sending…';
       try {
-        const res = await fetch(form.action, {
-          method: 'POST',
-          headers: { Accept: 'application/json' },
-          body: new FormData(form),
-        });
+        const res = await fetch(form.action, { method: 'POST', headers: { Accept: 'application/json' }, body: new FormData(form) });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error((data as { error?: string }).error || 'Something went wrong.');
         form.classList.add('hidden');
@@ -127,18 +149,8 @@ const label = 'block text-sm font-medium text-slate-700';
         err.textContent = (e as Error).message;
         err.classList.remove('hidden');
         btn.disabled = false;
-        btn.textContent = 'Get My Free Quote';
+        btn.textContent = 'Get My Free Quotes';
       }
-    });
-
-    // "Request Quote Through Us" / "Book" buttons on yard cards pre-select that yard.
-    document.querySelectorAll<HTMLElement>('[data-request-yard]').forEach((el) => {
-      el.addEventListener('click', () => {
-        (document.getElementById('lead-yard-id') as HTMLInputElement).value = el.dataset.requestYard ?? '';
-        const note = document.getElementById('lead-yard-note')!;
-        note.textContent = `Your request will be sent to ${el.dataset.yardName ?? 'this supplier'} first.`;
-        note.classList.remove('hidden');
-      });
     });
   }
 </script>
